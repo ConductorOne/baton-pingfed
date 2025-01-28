@@ -77,12 +77,12 @@ func (c *PingFederateClient) GetUsers(ctx context.Context) ([]PingFederateUser, 
 		return nil, fmt.Errorf("failed to get admin users: %w", err)
 	}
 	logger := ctxzap.Extract(ctx)
-	logger.Info("response: ", zap.Any("response", resp))
+	logger.Debug("response: ", zap.Any("response", resp))
 	return response.Items, nil
 }
 
-//GetRoles retrieves a list of PingFederate roles from the API
-//The default Initial administrator user has all the roles
+// GetRoles retrieves a list of PingFederate roles from the API
+// The default Initial administrator user has all the roles
 func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, error) {
 	err := c.Initialize(ctx)
 	if err != nil {
@@ -99,7 +99,6 @@ func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, 
 		return nil, fmt.Errorf("failed to get admin users: %w", err)
 	}
 	logger := ctxzap.Extract(ctx)
-
 	var stringRoles []string
 	for _, user := range response.Items {
 		if user.Username == "Administrator" {
@@ -150,7 +149,7 @@ func (c *PingFederateClient) GetRoleAssignments(ctx context.Context, roleID stri
 				usersWithRole = append(usersWithRole, user)
 			}
 		}
-	} else{
+	} else {
 		for _, user := range response.Items {
 			for _, role := range user.Roles {
 				if role == roleID {
@@ -160,10 +159,9 @@ func (c *PingFederateClient) GetRoleAssignments(ctx context.Context, roleID stri
 			}
 		}
 	}
-	
 
 	logger := ctxzap.Extract(ctx)
-	logger.Info("users with role",
+	logger.Debug("users with role",
 		zap.String("roleID", roleID),
 		zap.Int("userCount", len(usersWithRole)),
 	)
@@ -175,7 +173,7 @@ func (c *PingFederateClient) AddUserToRole(
 	ctx context.Context,
 	userId string,
 	roleId string,
-) ( error) {
+) error {
 	err := c.Initialize(ctx)
 	logger := ctxzap.Extract(ctx)
 
@@ -193,8 +191,12 @@ func (c *PingFederateClient) AddUserToRole(
 		return fmt.Errorf("failed to get user: %w", err)
 	}
 
-	user.Roles = append(user.Roles, roleId)
-	
+	if roleId == "AUDITOR" {
+		user.IsAuditor = true
+	} else {
+		user.Roles = append(user.Roles, roleId)
+	}
+
 	resp, err := c.client.R().
 		SetContext(ctx).
 		SetBody(user).
@@ -204,9 +206,9 @@ func (c *PingFederateClient) AddUserToRole(
 		return fmt.Errorf("failed to add role to user: %w", err)
 	}
 	if resp.StatusCode() != 200 {
-		return fmt.Errorf("failed to add role to user: %w", resp)
+		return fmt.Errorf("failed to add role to user: status code %d, response: %s", resp.StatusCode(), resp.String())
 	}
-	logger.Info("response: ", zap.Any("response", resp))
+	logger.Debug("response: ", zap.Any("response", resp))
 	return nil
 }
 
@@ -232,6 +234,10 @@ func (c *PingFederateClient) RemoveUserFromRole(
 		return fmt.Errorf("failed to get user: %w", err)
 	}
 
+	if roleId == "AUDITOR" {
+		user.IsAuditor = false
+	}
+
 	// Remove the role from the user's roles
 	var newRoles []string
 	for _, role := range user.Roles {
@@ -250,8 +256,8 @@ func (c *PingFederateClient) RemoveUserFromRole(
 		return fmt.Errorf("failed to remove role from user: %w", err)
 	}
 	if resp.StatusCode() != 200 {
-		return fmt.Errorf("failed to remove role from user: %w", resp)
+		return fmt.Errorf("failed to remove role from user: status code %d, response: %s", resp.StatusCode(), resp.String())
 	}
-	logger.Info("response: ", zap.Any("response", resp))
+	logger.Debug("response: ", zap.Any("response", resp))
 	return nil
 }

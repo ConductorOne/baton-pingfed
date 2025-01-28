@@ -18,7 +18,6 @@ type userBuilder struct {
 
 // userResource convert a PingFederateUser into a Resource.
 func userResource(
-	ctx context.Context,
 	user client.PingFederateUser,
 ) (*v2.Resource, error) {
 	displayName := user.Username
@@ -27,40 +26,23 @@ func userResource(
 		status = v2.UserTrait_Status_STATUS_ENABLED
 	}
 
-	email := "No email"
-	if user.Email != "" {
-		email = user.Email
-	}
-
-	isAuditor := "false"
-	if user.IsAuditor {
-		isAuditor = "true"
-	}
-
-	department := "No department"
-	if user.Department != "" {
-		department = user.Department
-	}
-
-	phoneNumber := "No phone number"
-	if user.PhoneNumber != "" {
-		phoneNumber = user.PhoneNumber
-	}
-
 	profile := map[string]interface{}{
 		"username":    user.Username,
-		"phoneNumber": phoneNumber,
-		"email":       email,
-		"isAuditor":   isAuditor,
-		"department":  department,
+		"phoneNumber": user.PhoneNumber,
+		"email":       user.Email,
+		"isAuditor":   user.IsAuditor,
+		"department":  user.Department,
 		"description": user.Description,
 	}
 
 	userTraitOptions := []resource.UserTraitOption{
 		resource.WithUserProfile(profile),
-		resource.WithEmail(email, true),
 		resource.WithStatus(status),
 		resource.WithUserLogin(user.Username),
+	}
+
+	if user.Email != "" {
+		userTraitOptions = append(userTraitOptions, resource.WithEmail(user.Email, true))
 	}
 
 	newUserResource, err := resource.NewUserResource(
@@ -99,7 +81,7 @@ func (b *userBuilder) List(
 
 	rv := make([]*v2.Resource, 0)
 	for _, user := range users {
-		ur, err := userResource(ctx, user)
+		ur, err := userResource(user)
 		if err != nil {
 			return nil, "", nil, err
 		}

@@ -7,16 +7,16 @@ import (
 var (
 	InstanceUrlField = field.StringField(
 		"instance-url",
-		field.WithDescription("Your Ping Federate domain, ex: https://pingfederateserver.com/"),
+		field.WithDescription("Your Ping Federate domain, ex: https://pingfederateserver.com"),
 		field.WithRequired(true),
 	)
 	UsernameField = field.StringField(
-		"pingfederate-username",
+		"username",
 		field.WithDescription("Ping Federate account username"),
 		field.WithRequired(true),
 	)
 	PasswordField = field.StringField(
-		"pingfederate-password",
+		"password",
 		field.WithDescription("Ping Federate account password"),
 		field.WithRequired(true),
 	)
