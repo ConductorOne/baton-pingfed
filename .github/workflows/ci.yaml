@@ -62,6 +62,8 @@ jobs:
       - name: Build baton
         working-directory: ./baton
         run: go build ./cmd/baton
+      - name: Make test script executable
+        run: chmod +x /test/grant-revoke.sh
       - name: Test grant/revoking admin entitlements
         env:
           BATON: ./baton/baton
