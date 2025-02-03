@@ -13,7 +13,7 @@ import (
 )
 
 type PingFederateClient struct {
-	baseUrl     string
+	baseURL     string
 	client      *uhttp.BaseHttpClient
 	Username    string
 	Password    string
@@ -21,16 +21,17 @@ type PingFederateClient struct {
 }
 
 const (
-	API_PATH = "/pf-admin-api/v1"
+	APIPath     = "/pf-admin-api/v1"
+	AuditorRole = "AUDITOR"
 )
 
 func New(
-	baseUrl string,
+	baseURL string,
 	username string,
 	password string,
 ) *PingFederateClient {
 	return &PingFederateClient{
-		baseUrl:  baseUrl,
+		baseURL:  baseURL,
 		Password: password,
 		Username: username,
 	}
@@ -44,7 +45,7 @@ func (c *PingFederateClient) Initialize(ctx context.Context) error {
 	}
 	logger.Debug("Initializing PingFederate client")
 
-	if c.baseUrl == "" {
+	if c.baseURL == "" {
 		return fmt.Errorf("base URL is required")
 	}
 
@@ -58,7 +59,7 @@ func (c *PingFederateClient) Initialize(ctx context.Context) error {
 	return nil
 }
 
-// GetUsers retrieves a list of PingFederate users from the API
+// GetUsers retrieves a list of PingFederate users from the API.
 func (c *PingFederateClient) GetUsers(ctx context.Context) ([]PingFederateUser, error) {
 	err := c.Initialize(ctx)
 	logger := ctxzap.Extract(ctx)
@@ -70,7 +71,7 @@ func (c *PingFederateClient) GetUsers(ctx context.Context) ([]PingFederateUser, 
 		return nil, fmt.Errorf("client is not properly initialized")
 	}
 
-	url := c.baseUrl + API_PATH + "/administrativeAccounts"
+	url := c.baseURL + APIPath + "/administrativeAccounts"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -89,6 +90,7 @@ func (c *PingFederateClient) GetUsers(ctx context.Context) ([]PingFederateUser, 
 	if resp == nil {
 		return nil, fmt.Errorf("API response was nil")
 	}
+	defer resp.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
 	}
@@ -97,8 +99,7 @@ func (c *PingFederateClient) GetUsers(ctx context.Context) ([]PingFederateUser, 
 	return response.Items, nil
 }
 
-// GetRoles retrieves a list of PingFederate roles from the API
-// The default Initial administrator user has all the roles
+// GetRoles retrieves a list of PingFederate roles from the API.
 func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, error) {
 	err := c.Initialize(ctx)
 	if err != nil {
@@ -106,7 +107,7 @@ func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, 
 	}
 
 	var response getAdminUsersResponse
-	url := c.baseUrl + API_PATH + "/administrativeAccounts"
+	url := c.baseURL + APIPath + "/administrativeAccounts"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -122,6 +123,7 @@ func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, 
 	if resp == nil {
 		return nil, fmt.Errorf("API response was nil")
 	}
+	defer resp.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
 	}
@@ -143,10 +145,10 @@ func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, 
 		})
 	}
 
-	//adding the Auditor role:
+	// Adding the Auditor role.
 	roles = append(roles, PingFederateRole{
-		Name: "AUDITOR",
-		ID:   "AUDITOR",
+		Name: AuditorRole,
+		ID:   AuditorRole,
 	})
 
 	logger.Debug("response: ", zap.Any("response", resp.Body))
@@ -160,7 +162,7 @@ func (c *PingFederateClient) GetRoleAssignments(ctx context.Context, roleID stri
 	}
 
 	var response getAdminUsersResponse
-	url := c.baseUrl + API_PATH + "/administrativeAccounts"
+	url := c.baseURL + APIPath + "/administrativeAccounts"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -176,13 +178,14 @@ func (c *PingFederateClient) GetRoleAssignments(ctx context.Context, roleID stri
 	if resp == nil {
 		return nil, fmt.Errorf("API response was nil")
 	}
+	defer resp.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
 	}
 
 	var usersWithRole []PingFederateUser
-	//Auditor is indicated by a bool
-	if roleID == "AUDITOR" {
+	// Auditor is indicated by a bool.
+	if c.isAuditor(roleID) {
 		for _, user := range response.Items {
 			if user.IsAuditor {
 				usersWithRole = append(usersWithRole, user)
@@ -208,6 +211,10 @@ func (c *PingFederateClient) GetRoleAssignments(ctx context.Context, roleID stri
 	return usersWithRole, nil
 }
 
+func (c *PingFederateClient) isAuditor(roleID string) bool {
+	return roleID == AuditorRole
+}
+
 func (c *PingFederateClient) AddUserToRole(
 	ctx context.Context,
 	userId string,
@@ -221,7 +228,7 @@ func (c *PingFederateClient) AddUserToRole(
 	}
 
 	var user PingFederateUser
-	url := c.baseUrl + API_PATH + "/administrativeAccounts/" + userId
+	url := c.baseURL + APIPath + "/administrativeAccounts/" + userId
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -237,11 +244,12 @@ func (c *PingFederateClient) AddUserToRole(
 	if resp == nil {
 		return fmt.Errorf("API response was nil")
 	}
+	defer resp.Body.Close()
 	if err != nil {
-		return fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
+		return fmt.Errorf("failed to get admin users: %w. status code: %d", err, resp.StatusCode)
 	}
 
-	if roleId == "AUDITOR" {
+	if c.isAuditor(roleId) {
 		user.IsAuditor = true
 	} else {
 		user.Roles = append(user.Roles, roleId)
@@ -265,11 +273,12 @@ func (c *PingFederateClient) AddUserToRole(
 	if resp2 == nil {
 		return fmt.Errorf("API response was nil")
 	}
+	defer resp2.Body.Close()
 	if err != nil {
 		return fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to add role to user: status code %d, response: %s", resp.StatusCode, resp.Body)
 	}
 	logger.Debug("response: ", zap.Any("response", resp.Body))
@@ -289,7 +298,7 @@ func (c *PingFederateClient) RemoveUserFromRole(
 	}
 
 	var user PingFederateUser
-	url := c.baseUrl + API_PATH + "/administrativeAccounts/" + userId
+	url := c.baseURL + APIPath + "/administrativeAccounts/" + userId
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -305,11 +314,12 @@ func (c *PingFederateClient) RemoveUserFromRole(
 	if resp == nil {
 		return fmt.Errorf("API response was nil")
 	}
+	defer resp.Body.Close()
 	if err != nil {
-		return fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
+		return fmt.Errorf("failed to get admin users: %w. status code: %d", err, resp.StatusCode)
 	}
 
-	if roleId == "AUDITOR" {
+	if c.isAuditor(roleId) {
 		user.IsAuditor = false
 	}
 	// Remove the role from the user's roles
@@ -339,11 +349,12 @@ func (c *PingFederateClient) RemoveUserFromRole(
 	if resp2 == nil {
 		return fmt.Errorf("API response was nil")
 	}
+	defer resp2.Body.Close()
 	if err != nil {
 		return fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to add role to user: status code %d, response: %s", resp.StatusCode, resp.Body)
 	}
 	logger.Debug("response: ", zap.Any("response", resp.Body))
