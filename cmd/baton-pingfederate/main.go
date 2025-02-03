@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ConductorOne/baton-pingfed/pkg/connector"
 	"github.com/conductorone/baton-sdk/pkg/config"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/field"
 	"github.com/conductorone/baton-sdk/pkg/types"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"github.com/sam-ng-nyedis/baton-pingfederate/pkg/connector"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )

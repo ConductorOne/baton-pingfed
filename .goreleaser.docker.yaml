@@ -1,0 +1,79 @@
+project_name: baton-pingfederate
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    main: ./cmd/baton-pingfederate
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    binary: baton-pingfederate
+
+dockers:
+  - image_templates:
+      - "ghcr.io/conductorone/baton-pingfederate:{{ .Version }}-amd64"
+      - "ghcr.io/conductorone/baton-pingfederate:latest-amd64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.title=baton-pingfederate"
+      - "--label=org.opencontainers.image.description=Baton connector for PingFederate"
+      - "--label=org.opencontainers.image.source=https://github.com/conductorone/baton-pingfederate"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.licenses=Apache-2.0"
+  - image_templates:
+      - "ghcr.io/conductorone/baton-pingfederate:{{ .Version }}-arm64"
+      - "ghcr.io/conductorone/baton-pingfederate:latest-arm64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.title=baton-pingfederate"
+      - "--label=org.opencontainers.image.description=Baton connector for PingFederate"
+      - "--label=org.opencontainers.image.source=https://github.com/conductorone/baton-pingfederate"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.licenses=Apache-2.0"
+    goarch: arm64
+
+docker_manifests:
+  - name_template: ghcr.io/conductorone/baton-pingfederate:{{ .Version }}
+    image_templates:
+      - ghcr.io/conductorone/baton-pingfederate:{{ .Version }}-amd64
+      - ghcr.io/conductorone/baton-pingfederate:{{ .Version }}-arm64
+  - name_template: ghcr.io/conductorone/baton-pingfederate:latest
+    image_templates:
+      - ghcr.io/conductorone/baton-pingfederate:latest-amd64
+      - ghcr.io/conductorone/baton-pingfederate:latest-arm64
+
+archives:
+  - format: binary
+    name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch

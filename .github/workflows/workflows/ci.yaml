@@ -1,0 +1,76 @@
+name: ci
+on: pull_request
+jobs:
+  go-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.21.x
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run linters
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=3m
+  go-test:
+    strategy:
+      matrix:
+        go-version: [1.21.x]
+        platform: [ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Install Go
+        if: success()
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: go tests
+        run: (set -o pipefail && go test -v -covermode=count -json ./... | tee test.json)
+      - name: annotate go tests
+        if: always()
+        uses: guyarb/golang-test-annotations@v0.5.1
+        with:
+          test-results: test.json
+  test:
+    runs-on: ubuntu-latest
+    env:
+      BATON_USERNAME: ${{ secrets.PINGFEDERATE_USERNAME }}
+      BATON_PASSWORD: ${{ secrets.PINGFEDERATE_PASSWORD }}
+      BATON_INSTANCE_URL: ${{ secrets.PINGFEDERATE_BASEURL }}
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.21.x
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build baton-pingfederate
+        run: go build ./cmd/baton-pingfederate
+      - name: Run baton-pingfederate
+        run: ./baton-pingfederate
+      - name: Checkout baton
+        uses: actions/checkout@v4
+        with:
+          repository: ConductorOne/baton
+          ref: main
+          path: ./baton
+      - name: Build baton
+        working-directory: ./baton
+        run: go build ./cmd/baton
+      - name: Test grant/revoking admin entitlements
+        env:
+          BATON: ./baton/baton
+          BATON_PINGFEDERATE: ./baton-pingfederate
+          BATON_USERNAME: ${{ secrets.PINGFEDERATE_USERNAME }}
+          BATON_PASSWORD: ${{ secrets.PINGFEDERATE_PASSWORD }}
+          BATON_INSTANCE_URL: ${{ secrets.PINGFEDERATE_BASEURL }}
+          BATON_GRANT: "role:EXPRESSION_ADMINISTRATOR:assigned:user:admin"
+          BATON_ENTITLEMENT: "role:EXPRESSION_ADMINISTRATOR:assigned"
+          BATON_PRINCIPAL: "admin"
+          BATON_PRINCIPAL_TYPE: "user"
+        run: ./test/grant-revoke.sh

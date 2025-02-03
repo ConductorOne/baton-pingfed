@@ -1,18 +1,20 @@
 package client
 
 import (
+	"bytes"
 	"context"
-	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"net/http"
 
-	"github.com/go-resty/resty/v2"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 )
 
 type PingFederateClient struct {
 	baseUrl     string
-	client      *resty.Client
+	client      *uhttp.BaseHttpClient
 	Username    string
 	Password    string
 	initialized bool
@@ -46,16 +48,12 @@ func (c *PingFederateClient) Initialize(ctx context.Context) error {
 		return fmt.Errorf("base URL is required")
 	}
 
-	restyClient := resty.New()
-	restyClient.SetBaseURL(c.baseUrl)
-	restyClient.SetHeader("X-XSRF-Header", "PingFederate")
-	restyClient.SetHeader("Accept", "application/json")
+	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, nil))
+	if err != nil {
+		return err
+	}
 
-	auth := c.Username + ":" + c.Password
-	authHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
-	restyClient.SetHeader("Authorization", authHeader)
-
-	c.client = restyClient
+	c.client = uhttp.NewBaseHttpClient(httpClient)
 	c.initialized = true
 	return nil
 }
@@ -63,21 +61,39 @@ func (c *PingFederateClient) Initialize(ctx context.Context) error {
 // GetUsers retrieves a list of PingFederate users from the API
 func (c *PingFederateClient) GetUsers(ctx context.Context) ([]PingFederateUser, error) {
 	err := c.Initialize(ctx)
+	logger := ctxzap.Extract(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	var response getAdminUsersResponse
-	resp, err := c.client.R().
-		SetContext(ctx).
-		SetResult(&response).
-		Get(c.baseUrl + API_PATH + "/administrativeAccounts")
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get admin users: %w", err)
+	if c.client == nil {
+		return nil, fmt.Errorf("client is not properly initialized")
 	}
-	logger := ctxzap.Extract(ctx)
-	logger.Debug("response: ", zap.Any("response", resp))
+
+	url := c.baseUrl + API_PATH + "/administrativeAccounts"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.SetBasicAuth(c.Username, c.Password)
+	req.Header.Set("X-XSRF-Header", "PingFederate")
+	req.Header.Set("Accept", "application/json")
+
+	var response getAdminUsersResponse
+	resp, err := c.client.Do(
+		req,
+		uhttp.WithJSONResponse(&response),
+	)
+	if resp == nil {
+		return nil, fmt.Errorf("API response was nil")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
+	}
+
+	logger.Debug("response: ", zap.Any("response", resp.Body))
 	return response.Items, nil
 }
 
@@ -90,14 +106,26 @@ func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, 
 	}
 
 	var response getAdminUsersResponse
-	_, err = c.client.R().
-		SetContext(ctx).
-		SetResult(&response).
-		Get(c.baseUrl + API_PATH + "/administrativeAccounts")
+	url := c.baseUrl + API_PATH + "/administrativeAccounts"
 
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get admin users: %w", err)
+		return nil, err
 	}
+	req.SetBasicAuth(c.Username, c.Password)
+	req.Header.Set("X-XSRF-Header", "PingFederate")
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.client.Do(
+		req,
+		uhttp.WithJSONResponse(&response),
+	)
+	if resp == nil {
+		return nil, fmt.Errorf("API response was nil")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
+	}
+
 	logger := ctxzap.Extract(ctx)
 	var stringRoles []string
 	for _, user := range response.Items {
@@ -121,7 +149,7 @@ func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, 
 		ID:   "AUDITOR",
 	})
 
-	logger.Info("roles: ", zap.Any("roles", roles))
+	logger.Debug("response: ", zap.Any("response", resp.Body))
 	return roles, nil
 }
 
@@ -132,13 +160,24 @@ func (c *PingFederateClient) GetRoleAssignments(ctx context.Context, roleID stri
 	}
 
 	var response getAdminUsersResponse
-	_, err = c.client.R().
-		SetContext(ctx).
-		SetResult(&response).
-		Get(c.baseUrl + API_PATH + "/administrativeAccounts")
+	url := c.baseUrl + API_PATH + "/administrativeAccounts"
 
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get admin users: %w", err)
+		return nil, err
+	}
+	req.SetBasicAuth(c.Username, c.Password)
+	req.Header.Set("X-XSRF-Header", "PingFederate")
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.client.Do(
+		req,
+		uhttp.WithJSONResponse(&response),
+	)
+	if resp == nil {
+		return nil, fmt.Errorf("API response was nil")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
 	}
 
 	var usersWithRole []PingFederateUser
@@ -182,13 +221,24 @@ func (c *PingFederateClient) AddUserToRole(
 	}
 
 	var user PingFederateUser
-	_, err = c.client.R().
-		SetContext(ctx).
-		SetResult(&user).
-		Get(c.baseUrl + API_PATH + "/administrativeAccounts/" + userId)
+	url := c.baseUrl + API_PATH + "/administrativeAccounts/" + userId
 
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+		return err
+	}
+	req.SetBasicAuth(c.Username, c.Password)
+	req.Header.Set("X-XSRF-Header", "PingFederate")
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.client.Do(
+		req,
+		uhttp.WithJSONResponse(&user),
+	)
+	if resp == nil {
+		return fmt.Errorf("API response was nil")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
 	}
 
 	if roleId == "AUDITOR" {
@@ -197,18 +247,32 @@ func (c *PingFederateClient) AddUserToRole(
 		user.Roles = append(user.Roles, roleId)
 	}
 
-	resp, err := c.client.R().
-		SetContext(ctx).
-		SetBody(user).
-		Put(c.baseUrl + API_PATH + "/administrativeAccounts/" + userId)
-
+	userJSON, err := json.Marshal(user)
 	if err != nil {
-		return fmt.Errorf("failed to add role to user: %w", err)
+		return fmt.Errorf("Error marshalling user")
 	}
-	if resp.StatusCode() != 200 {
-		return fmt.Errorf("failed to add role to user: status code %d, response: %s", resp.StatusCode(), resp.String())
+
+	req2, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(userJSON))
+	if err != nil {
+		return err
 	}
-	logger.Debug("response: ", zap.Any("response", resp))
+	req2.SetBasicAuth(c.Username, c.Password)
+	req2.Header.Set("X-XSRF-Header", "PingFederate")
+	req2.Header.Set("Accept", "application/json")
+	resp2, err := c.client.Do(
+		req2,
+	)
+	if resp2 == nil {
+		return fmt.Errorf("API response was nil")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
+	}
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("failed to add role to user: status code %d, response: %s", resp.StatusCode, resp.Body)
+	}
+	logger.Debug("response: ", zap.Any("response", resp.Body))
 	return nil
 }
 
@@ -225,19 +289,29 @@ func (c *PingFederateClient) RemoveUserFromRole(
 	}
 
 	var user PingFederateUser
-	_, err = c.client.R().
-		SetContext(ctx).
-		SetResult(&user).
-		Get(c.baseUrl + API_PATH + "/administrativeAccounts/" + userId)
+	url := c.baseUrl + API_PATH + "/administrativeAccounts/" + userId
 
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+		return err
+	}
+	req.SetBasicAuth(c.Username, c.Password)
+	req.Header.Set("X-XSRF-Header", "PingFederate")
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.client.Do(
+		req,
+		uhttp.WithJSONResponse(&user),
+	)
+	if resp == nil {
+		return fmt.Errorf("API response was nil")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
 	}
 
 	if roleId == "AUDITOR" {
 		user.IsAuditor = false
 	}
-
 	// Remove the role from the user's roles
 	var newRoles []string
 	for _, role := range user.Roles {
@@ -247,17 +321,31 @@ func (c *PingFederateClient) RemoveUserFromRole(
 	}
 	user.Roles = newRoles
 
-	resp, err := c.client.R().
-		SetContext(ctx).
-		SetBody(user).
-		Put(c.baseUrl + API_PATH + "/administrativeAccounts/" + userId)
-
+	userJSON, err := json.Marshal(user)
 	if err != nil {
-		return fmt.Errorf("failed to remove role from user: %w", err)
+		return fmt.Errorf("Error marshalling user")
 	}
-	if resp.StatusCode() != 200 {
-		return fmt.Errorf("failed to remove role from user: status code %d, response: %s", resp.StatusCode(), resp.String())
+
+	req2, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(userJSON))
+	if err != nil {
+		return err
 	}
-	logger.Debug("response: ", zap.Any("response", resp))
+	req2.SetBasicAuth(c.Username, c.Password)
+	req2.Header.Set("X-XSRF-Header", "PingFederate")
+	req2.Header.Set("Accept", "application/json")
+	resp2, err := c.client.Do(
+		req2,
+	)
+	if resp2 == nil {
+		return fmt.Errorf("API response was nil")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get admon users: %w. status code: %d", err, resp.StatusCode)
+	}
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("failed to add role to user: status code %d, response: %s", resp.StatusCode, resp.Body)
+	}
+	logger.Debug("response: ", zap.Any("response", resp.Body))
 	return nil
 }

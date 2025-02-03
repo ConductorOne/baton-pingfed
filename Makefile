@@ -25,4 +25,24 @@ add-dep:
 
 .PHONY: lint
 lint:
-	golangci-lint run
+	golangci-lint run ./...
+
+.PHONY: lint-fix
+lint-fix:
+	golangci-lint run --fix ./...
+
+.PHONY: release
+release:
+	goreleaser release --rm-dist
+
+.PHONY: release-snapshot
+release-snapshot:
+	goreleaser release --snapshot --rm-dist
+
+.PHONY: install-tools
+install-tools:
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install github.com/goreleaser/goreleaser@latest
+
+.PHONY: ci
+ci: install-tools lint build
