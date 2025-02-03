@@ -249,7 +249,7 @@ func (c *PingFederateClient) AddUserToRole(
 
 	userJSON, err := json.Marshal(user)
 	if err != nil {
-		return fmt.Errorf("Error marshalling user")
+		return fmt.Errorf("Error marshaling user")
 	}
 
 	req2, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(userJSON))
@@ -323,7 +323,7 @@ func (c *PingFederateClient) RemoveUserFromRole(
 
 	userJSON, err := json.Marshal(user)
 	if err != nil {
-		return fmt.Errorf("Error marshalling user")
+		return fmt.Errorf("Error marshaling user")
 	}
 
 	req2, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(userJSON))
