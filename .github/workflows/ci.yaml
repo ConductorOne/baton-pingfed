@@ -53,24 +53,12 @@ jobs:
         run: go build ./cmd/baton-pingfederate
       - name: Run baton-pingfederate
         run: ./baton-pingfederate
-      - name: Checkout baton
-        uses: actions/checkout@v4
-        with:
-          repository: ConductorOne/baton
-          ref: main
-          path: ./baton
-      - name: Build baton
-        working-directory: ./baton
-        run: go build ./cmd/baton
-      - name: Make test script executable
-        run: chmod +x test/grant-revoke.sh
+      - name: Install baton
+        run: ./scripts/get-baton.sh && mv baton /usr/local/bin
       - name: Test grant/revoking admin entitlements
         env:
-          BATON: ./baton/baton
+          BATON: baton
           BATON_PINGFEDERATE: ./baton-pingfederate
-          BATON_USERNAME: ${{ secrets.PINGFEDERATE_USERNAME }}
-          BATON_PASSWORD: ${{ secrets.PINGFEDERATE_PASSWORD }}
-          BATON_INSTANCE_URL: ${{ secrets.PINGFEDERATE_BASEURL }}
           BATON_GRANT: "role:EXPRESSION_ADMINISTRATOR:assigned:user:admin"
           BATON_ENTITLEMENT: "role:EXPRESSION_ADMINISTRATOR:assigned"
           BATON_PRINCIPAL: "admin"
