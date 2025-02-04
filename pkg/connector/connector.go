@@ -82,13 +82,12 @@ func New(
 		zap.Bool("password?", password != ""),
 	)
 
-	PingFederateClient := client.New(
+	PingFederateClient, err := client.New(
+		ctx,
 		instanceURL,
 		username,
 		password,
 	)
-
-	err = PingFederateClient.Initialize(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -1,24 +1,19 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"go.uber.org/zap"
 )
 
 type PingFederateClient struct {
-	baseURL     string
-	client      *uhttp.BaseHttpClient
-	Username    string
-	Password    string
-	initialized bool
+	baseURL  string
+	client   *uhttp.BaseHttpClient
+	Username string
+	Password string
 }
 
 const (
@@ -27,107 +22,72 @@ const (
 )
 
 func New(
+	ctx context.Context,
 	baseURL string,
 	username string,
 	password string,
-) *PingFederateClient {
-	return &PingFederateClient{
-		baseURL:  baseURL,
-		Password: password,
-		Username: username,
-	}
-}
-
-func (c *PingFederateClient) Initialize(ctx context.Context) error {
-	logger := ctxzap.Extract(ctx)
-	if c.initialized {
-		logger.Debug("PingFederate client already initialized")
-		return nil
-	}
-	logger.Debug("Initializing PingFederate client")
-
-	if c.baseURL == "" {
-		return fmt.Errorf("base URL is required")
+) (*PingFederateClient, error) {
+	if baseURL == "" {
+		return nil, fmt.Errorf("base URL is required")
 	}
 
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, nil))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	c.client = uhttp.NewBaseHttpClient(httpClient)
-	c.initialized = true
-	return nil
+	client, err := uhttp.NewBaseHttpClientWithContext(ctx, httpClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PingFederateClient{
+		baseURL:  baseURL,
+		Password: password,
+		Username: username,
+		client:   client,
+	}, nil
 }
 
 // doRequest performs an HTTP request and handles common response processing.
 func (c *PingFederateClient) doRequest(ctx context.Context, method, path string, body interface{}, response interface{}) error {
-	logger := ctxzap.Extract(ctx)
-	url := c.baseURL + APIPath + path
-
-	var bodyReader io.Reader
-	if body != nil {
-		bodyBytes, err := json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("error marshaling request body: %w", err)
-		}
-		bodyReader = bytes.NewBuffer(bodyBytes)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+	// logger := ctxzap.Extract(ctx)
+	u, err := url.Parse(c.baseURL)
 	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
+		return err
+	}
+	u = u.JoinPath(APIPath, path)
+
+	reqOpts := []uhttp.RequestOption{
+		uhttp.WithAcceptJSONHeader(),
+		uhttp.WithHeader("X-XSRF-Header", "PingFederate"),
+	}
+	if body != nil {
+		reqOpts = append(reqOpts, uhttp.WithJSONBody(body), uhttp.WithContentTypeJSONHeader())
 	}
 
+	req, err := c.client.NewRequest(ctx, method, u, reqOpts...)
+	if err != nil {
+		return err
+	}
 	req.SetBasicAuth(c.Username, c.Password)
-	req.Header.Set("X-XSRF-Header", "PingFederate")
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
 
-	var resp *http.Response
+	doOpts := []uhttp.DoOption{}
 	if response != nil {
-		resp, err = c.client.Do(req, uhttp.WithJSONResponse(response))
-	} else {
-		resp, err = c.client.Do(req)
+		doOpts = append(doOpts, uhttp.WithJSONResponse(response))
 	}
 
-	if err != nil {
-		return fmt.Errorf("request failed: %w. status code: %d", err, resp.StatusCode)
+	resp, err := c.client.Do(req, doOpts...)
+	if resp != nil {
+		defer resp.Body.Close()
 	}
-
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
-	}
-	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed with status code %d, response: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	logger.Debug("response",
-		zap.String("method", method),
-		zap.String("path", path),
-		zap.Int("status_code", resp.StatusCode),
-		zap.String("body", string(bodyBytes)),
-	)
-
-	return nil
+	return err
 }
 
 // GetUsers retrieves a list of PingFederate users from the API.
 func (c *PingFederateClient) GetUsers(ctx context.Context) ([]PingFederateUser, error) {
-	err := c.Initialize(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client: %w", err)
-	}
-
 	var response getAdminUsersResponse
-	err = c.doRequest(ctx, http.MethodGet, "/administrativeAccounts", nil, &response)
+	err := c.doRequest(ctx, http.MethodGet, "/administrativeAccounts", nil, &response)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get users: %w", err)
 	}
@@ -137,13 +97,8 @@ func (c *PingFederateClient) GetUsers(ctx context.Context) ([]PingFederateUser, 
 
 // GetRoles retrieves a list of PingFederate roles from the API.
 func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, error) {
-	err := c.Initialize(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client: %w", err)
-	}
-
 	var response getAdminUsersResponse
-	err = c.doRequest(ctx, http.MethodGet, "/administrativeAccounts", nil, &response)
+	err := c.doRequest(ctx, http.MethodGet, "/administrativeAccounts", nil, &response)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get roles: %w", err)
 	}
@@ -173,13 +128,8 @@ func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, 
 }
 
 func (c *PingFederateClient) GetRoleAssignments(ctx context.Context, roleID string) ([]PingFederateUser, error) {
-	err := c.Initialize(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client: %w", err)
-	}
-
 	var response getAdminUsersResponse
-	err = c.doRequest(ctx, http.MethodGet, "/administrativeAccounts", nil, &response)
+	err := c.doRequest(ctx, http.MethodGet, "/administrativeAccounts", nil, &response)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get role assignments: %w", err)
 	}
@@ -206,13 +156,8 @@ func (c *PingFederateClient) GetRoleAssignments(ctx context.Context, roleID stri
 }
 
 func (c *PingFederateClient) AddUserToRole(ctx context.Context, userID string, roleID string) error {
-	err := c.Initialize(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to initialize client: %w", err)
-	}
-
 	var user PingFederateUser
-	err = c.doRequest(ctx, http.MethodGet, "/administrativeAccounts/"+userID, nil, &user)
+	err := c.doRequest(ctx, http.MethodGet, "/administrativeAccounts/"+userID, nil, &user)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
@@ -232,13 +177,8 @@ func (c *PingFederateClient) AddUserToRole(ctx context.Context, userID string, r
 }
 
 func (c *PingFederateClient) RemoveUserFromRole(ctx context.Context, userID string, roleID string) error {
-	err := c.Initialize(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to initialize client: %w", err)
-	}
-
 	var user PingFederateUser
-	err = c.doRequest(ctx, http.MethodGet, "/administrativeAccounts/"+userID, nil, &user)
+	err := c.doRequest(ctx, http.MethodGet, "/administrativeAccounts/"+userID, nil, &user)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
