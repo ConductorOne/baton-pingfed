@@ -1,4 +1,4 @@
-module github.com/ConductorOne/baton-pingfed
+module github.com/conductorone/baton-pingfed
 
 go 1.22.10
 
