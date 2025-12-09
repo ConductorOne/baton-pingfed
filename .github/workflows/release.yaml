@@ -12,7 +12,6 @@ jobs:
     with:
       tag: ${{ github.ref_name }}
       lambda: false
-      darwin: false
     secrets:
       RELENG_GITHUB_TOKEN: ${{ secrets.RELENG_GITHUB_TOKEN }}
       APPLE_SIGNING_KEY_P12: ${{ secrets.APPLE_SIGNING_KEY_P12 }}
