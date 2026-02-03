@@ -25,9 +25,6 @@ type createTicketTaskHandler struct {
 }
 
 func (c *createTicketTaskHandler) HandleTask(ctx context.Context) error {
-	ctx, span := tracer.Start(ctx, "createTicketTaskHandler.HandleTask")
-	defer span.End()
-
 	l := ctxzap.Extract(ctx)
 
 	t := c.task.GetCreateTicketTask()
@@ -37,11 +34,11 @@ func (c *createTicketTaskHandler) HandleTask(ctx context.Context) error {
 	}
 
 	cc := c.helpers.ConnectorClient()
-	resp, err := cc.CreateTicket(ctx, v2.TicketsServiceCreateTicketRequest_builder{
+	resp, err := cc.CreateTicket(ctx, &v2.TicketsServiceCreateTicketRequest{
 		Request:     t.GetTicketRequest(),
 		Schema:      t.GetTicketSchema(),
 		Annotations: t.GetAnnotations(),
-	}.Build())
+	})
 	if err != nil {
 		l.Error("failed creating ticket", zap.Error(err))
 		return c.helpers.FinishTask(ctx, nil, t.GetAnnotations(), err)
@@ -50,7 +47,7 @@ func (c *createTicketTaskHandler) HandleTask(ctx context.Context) error {
 	respAnnos := annotations.Annotations(resp.GetAnnotations())
 	respAnnos.Merge(t.GetAnnotations()...)
 
-	resp.SetAnnotations(respAnnos)
+	resp.Annotations = respAnnos
 
 	return c.helpers.FinishTask(ctx, resp, respAnnos, nil)
 }

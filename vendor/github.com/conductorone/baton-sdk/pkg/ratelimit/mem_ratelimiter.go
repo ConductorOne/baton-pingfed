@@ -6,6 +6,7 @@ import (
 	"time"
 
 	ratelimitV1 "github.com/conductorone/baton-sdk/pb/c1/ratelimit/v1"
+	v1 "github.com/conductorone/baton-sdk/pb/c1/ratelimit/v1"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	rl "go.uber.org/ratelimit"
 	"go.uber.org/zap"
@@ -21,22 +22,22 @@ type MemRateLimiter struct {
 // TODO
 func (m *MemRateLimiter) Do(ctx context.Context, req *ratelimitV1.DoRequest) (*ratelimitV1.DoResponse, error) {
 	if m.limiter == nil {
-		return ratelimitV1.DoResponse_builder{
-			RequestToken: req.GetRequestToken(),
-			Description: ratelimitV1.RateLimitDescription_builder{
-				Status: ratelimitV1.RateLimitDescription_STATUS_EMPTY,
-			}.Build(),
-		}.Build(), nil
+		return &v1.DoResponse{
+			RequestToken: req.RequestToken,
+			Description: &v1.RateLimitDescription{
+				Status: v1.RateLimitDescription_STATUS_EMPTY,
+			},
+		}, nil
 	}
 
 	m.limiter.Take()
 
-	return ratelimitV1.DoResponse_builder{
-		RequestToken: req.GetRequestToken(),
-		Description: ratelimitV1.RateLimitDescription_builder{
-			Status: ratelimitV1.RateLimitDescription_STATUS_EMPTY,
-		}.Build(),
-	}.Build(), nil
+	return &v1.DoResponse{
+		RequestToken: req.RequestToken,
+		Description: &v1.RateLimitDescription{
+			Status: v1.RateLimitDescription_STATUS_EMPTY,
+		},
+	}, nil
 }
 
 // Report updates the rate limiter with relevant information.
@@ -53,20 +54,20 @@ func (m *MemRateLimiter) Report(ctx context.Context, req *ratelimitV1.ReportRequ
 	}
 	desc := req.GetDescription()
 
-	if !desc.HasResetAt() {
+	if desc.ResetAt == nil {
 		return &ratelimitV1.ReportResponse{}, nil
 	}
 
-	if desc.GetRemaining() == 0 {
+	if desc.Remaining == 0 {
 		return &ratelimitV1.ReportResponse{}, nil
 	}
 
-	resetAt := desc.GetResetAt().AsTime().UTC()
+	resetAt := desc.ResetAt.AsTime().UTC()
 	windowDuration := resetAt.Sub(m.now())
 	if windowDuration > 5*time.Minute {
 		windowDuration = 5 * time.Minute
 	}
-	remaining := int64(m.usePercent * float64(desc.GetRemaining()))
+	remaining := int64(m.usePercent * float64(desc.Remaining))
 	if remaining < 1 {
 		remaining = 1
 	}
@@ -75,7 +76,7 @@ func (m *MemRateLimiter) Report(ctx context.Context, req *ratelimitV1.ReportRequ
 	ctxzap.Extract(ctx).Debug(
 		"updating rate limiter",
 		zap.Int64("calculated_remaining", remaining),
-		zap.Int64("remaining", desc.GetRemaining()),
+		zap.Int64("remaining", desc.Remaining),
 		zap.Int64("rate", limiterSize),
 		zap.Time("reset_at", resetAt),
 	)

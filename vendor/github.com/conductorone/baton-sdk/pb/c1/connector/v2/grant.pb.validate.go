@@ -116,7 +116,7 @@ type GrantSourcesMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GrantSourcesMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -368,7 +368,7 @@ type GrantMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GrantMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -558,21 +558,6 @@ func (m *GrantsServiceListGrantsRequest) validate(all bool) error {
 
 	}
 
-	if m.GetActiveSyncId() != "" {
-
-		if l := len(m.GetActiveSyncId()); l < 1 || l > 1024 {
-			err := GrantsServiceListGrantsRequestValidationError{
-				field:  "ActiveSyncId",
-				reason: "value length must be between 1 and 1024 bytes, inclusive",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
-
-	}
-
 	if len(errors) > 0 {
 		return GrantsServiceListGrantsRequestMultiError(errors)
 	}
@@ -587,7 +572,7 @@ type GrantsServiceListGrantsRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GrantsServiceListGrantsRequestMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -773,7 +758,7 @@ type GrantsServiceListGrantsResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GrantsServiceListGrantsResponseMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -990,7 +975,7 @@ type GrantManagerServiceGrantRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GrantManagerServiceGrantRequestMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1163,7 +1148,7 @@ type GrantManagerServiceGrantResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GrantManagerServiceGrantResponseMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1342,7 +1327,7 @@ type GrantManagerServiceRevokeRequestMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GrantManagerServiceRevokeRequestMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1481,7 +1466,7 @@ type GrantManagerServiceRevokeResponseMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GrantManagerServiceRevokeResponseMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}
@@ -1584,7 +1569,7 @@ type GrantSources_GrantSourceMultiError []error
 
 // Error returns a concatenation of all the error messages it wraps.
 func (m GrantSources_GrantSourceMultiError) Error() string {
-	msgs := make([]string, 0, len(m))
+	var msgs []string
 	for _, err := range m {
 		msgs = append(msgs, err.Error())
 	}

@@ -6,6 +6,8 @@ import (
 
 	"github.com/conductorone/baton-pingfed/pkg/connector/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
 )
 
@@ -65,53 +67,56 @@ func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 func (b *userBuilder) List(
 	ctx context.Context,
 	resourceID *v2.ResourceId,
-	opts resource.SyncOpAttrs,
+	token *pagination.Token,
 ) (
 	[]*v2.Resource,
-	*resource.SyncOpResults,
+	string,
+	annotations.Annotations,
 	error,
 ) {
 	users, err := b.client.GetUsers(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list users: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to list users: %w", err)
 	}
 
 	rv := make([]*v2.Resource, 0)
 	for _, user := range users {
 		ur, err := userResource(user)
 		if err != nil {
-			return nil, nil, err
+			return nil, "", nil, err
 		}
 		rv = append(rv, ur)
 	}
 
-	return rv, &resource.SyncOpResults{NextPageToken: "", Annotations: nil}, nil
+	return rv, "", nil, nil
 }
 
 // Entitlements always returns an empty slice for users.
 func (o *userBuilder) Entitlements(
 	_ context.Context,
-	r *v2.Resource,
-	_ resource.SyncOpAttrs,
+	resource *v2.Resource,
+	_ *pagination.Token,
 ) (
 	[]*v2.Entitlement,
-	*resource.SyncOpResults,
+	string,
+	annotations.Annotations,
 	error,
 ) {
-	return nil, &resource.SyncOpResults{NextPageToken: "", Annotations: nil}, nil
+	return nil, "", nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
 func (o *userBuilder) Grants(
 	ctx context.Context,
-	r *v2.Resource,
-	opts resource.SyncOpAttrs,
+	resource *v2.Resource,
+	pToken *pagination.Token,
 ) (
 	[]*v2.Grant,
-	*resource.SyncOpResults,
+	string,
+	annotations.Annotations,
 	error,
 ) {
-	return nil, &resource.SyncOpResults{NextPageToken: "", Annotations: nil}, nil
+	return nil, "", nil, nil
 }
 
 func newUserBuilder(

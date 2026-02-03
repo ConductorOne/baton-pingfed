@@ -49,19 +49,8 @@ func (r *assetsTable) Schema() (string, []interface{}) {
 	}
 }
 
-func (r *assetsTable) Migrations(ctx context.Context, db *goqu.Database) error {
-	return nil
-}
-
 // PutAsset stores the given asset in the database.
 func (c *C1File) PutAsset(ctx context.Context, assetRef *v2.AssetRef, contentType string, data []byte) error {
-	ctx, span := tracer.Start(ctx, "C1File.PutAsset")
-	defer span.End()
-
-	if c.readOnly {
-		return ErrReadOnly
-	}
-
 	l := ctxzap.Extract(ctx)
 
 	if len(data) == 0 {
@@ -80,7 +69,7 @@ func (c *C1File) PutAsset(ctx context.Context, assetRef *v2.AssetRef, contentTyp
 	}
 
 	fields := goqu.Record{
-		"external_id":   assetRef.GetId(),
+		"external_id":   assetRef.Id,
 		"content_type":  contentType,
 		"data":          data,
 		"sync_id":       c.currentSyncID,
@@ -109,21 +98,18 @@ func (c *C1File) PutAsset(ctx context.Context, assetRef *v2.AssetRef, contentTyp
 // GetAsset fetches the specified asset from the database, and returns the content type and an io.Reader for the caller to
 // read the asset from.
 func (c *C1File) GetAsset(ctx context.Context, request *v2.AssetServiceGetAssetRequest) (string, io.Reader, error) {
-	ctx, span := tracer.Start(ctx, "C1File.GetAsset")
-	defer span.End()
-
 	err := c.validateDb(ctx)
 	if err != nil {
 		return "", nil, err
 	}
 
-	if !request.HasAsset() {
+	if request.Asset == nil {
 		return "", nil, fmt.Errorf("asset is required")
 	}
 
 	q := c.db.From(assets.Name()).Prepared(true)
 	q = q.Select("content_type", "data")
-	q = q.Where(goqu.C("external_id").Eq(request.GetAsset().GetId()))
+	q = q.Where(goqu.C("external_id").Eq(request.Asset.Id))
 
 	if c.currentSyncID != "" {
 		q = q.Where(goqu.C("sync_id").Eq(c.currentSyncID))

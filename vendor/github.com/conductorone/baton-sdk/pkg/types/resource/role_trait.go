@@ -1,10 +1,10 @@
 package resource
 
 import (
+	"fmt"
+
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -17,23 +17,7 @@ func WithRoleProfile(profile map[string]interface{}) RoleTraitOption {
 			return err
 		}
 
-		rt.SetProfile(p)
-
-		return nil
-	}
-}
-
-func WithRoleScopeConditions(typ string, conditions []string) RoleTraitOption {
-	return func(rt *v2.RoleTrait) error {
-		rt.RoleScopeConditions = &v2.RoleScopeConditions{
-			Type:       typ,
-			Conditions: make([]*v2.RoleScopeCondition, len(conditions)),
-		}
-		for i, condition := range conditions {
-			rt.RoleScopeConditions.Conditions[i] = &v2.RoleScopeCondition{
-				Expression: condition,
-			}
-		}
+		rt.Profile = p
 
 		return nil
 	}
@@ -56,13 +40,13 @@ func NewRoleTrait(opts ...RoleTraitOption) (*v2.RoleTrait, error) {
 // GetRoleTrait attempts to return the RoleTrait instance on a resource.
 func GetRoleTrait(resource *v2.Resource) (*v2.RoleTrait, error) {
 	ret := &v2.RoleTrait{}
-	annos := annotations.Annotations(resource.GetAnnotations())
+	annos := annotations.Annotations(resource.Annotations)
 	ok, err := annos.Pick(ret)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "role trait was not found on resource")
+		return nil, fmt.Errorf("group trait was not found on resource")
 	}
 
 	return ret, nil

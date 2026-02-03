@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
-
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	v1 "github.com/conductorone/baton-sdk/pb/c1/connectorapi/baton/v1"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/types"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 type bulkGetTicketsTaskHelpers interface {
@@ -25,9 +24,6 @@ type bulkGetTicketTaskHandler struct {
 }
 
 func (c *bulkGetTicketTaskHandler) HandleTask(ctx context.Context) error {
-	ctx, span := tracer.Start(ctx, "bulkGetTicketTaskHandler.HandleTask")
-	defer span.End()
-
 	l := ctxzap.Extract(ctx)
 
 	cc := c.helpers.ConnectorClient()
@@ -40,15 +36,15 @@ func (c *bulkGetTicketTaskHandler) HandleTask(ctx context.Context) error {
 
 	ticketRequests := make([]*v2.TicketsServiceGetTicketRequest, 0)
 	for _, getTicketTask := range t.GetTicketRequests() {
-		ticketRequests = append(ticketRequests, v2.TicketsServiceGetTicketRequest_builder{
+		ticketRequests = append(ticketRequests, &v2.TicketsServiceGetTicketRequest{
 			Id:          getTicketTask.GetTicketId(),
 			Annotations: getTicketTask.GetAnnotations(),
-		}.Build())
+		})
 	}
 
-	resp, err := cc.BulkGetTickets(ctx, v2.TicketsServiceBulkGetTicketsRequest_builder{
+	resp, err := cc.BulkGetTickets(ctx, &v2.TicketsServiceBulkGetTicketsRequest{
 		TicketRequests: ticketRequests,
-	}.Build())
+	})
 	if err != nil {
 		return c.helpers.FinishTask(ctx, nil, nil, err)
 	}

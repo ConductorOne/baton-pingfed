@@ -7,11 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
-
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	v1 "github.com/conductorone/baton-sdk/pb/c1/connectorapi/baton/v1"
@@ -56,17 +54,16 @@ func (m *localBulkCreateTicket) ShouldDebug() bool {
 func (m *localBulkCreateTicket) Next(ctx context.Context) (*v1.Task, time.Duration, error) {
 	var task *v1.Task
 	m.o.Do(func() {
-		task = v1.Task_builder{
-			BulkCreateTickets: &v1.Task_BulkCreateTicketsTask{},
-		}.Build()
+		task = &v1.Task{
+			TaskType: &v1.Task_BulkCreateTickets{
+				BulkCreateTickets: &v1.Task_BulkCreateTicketsTask{},
+			},
+		}
 	})
 	return task, 0, nil
 }
 
 func (m *localBulkCreateTicket) Process(ctx context.Context, task *v1.Task, cc types.ConnectorClient) error {
-	ctx, span := tracer.Start(ctx, "localBulkCreateTicket.Process", trace.WithNewRoot())
-	defer span.End()
-
 	l := ctxzap.Extract(ctx)
 
 	templates, err := m.loadTicketTemplate(ctx)
@@ -76,23 +73,23 @@ func (m *localBulkCreateTicket) Process(ctx context.Context, task *v1.Task, cc t
 
 	ticketReqs := make([]*v2.TicketsServiceCreateTicketRequest, 0)
 	for _, template := range templates.Tickets {
-		schema, err := cc.GetTicketSchema(ctx, v2.TicketsServiceGetTicketSchemaRequest_builder{
+		schema, err := cc.GetTicketSchema(ctx, &v2.TicketsServiceGetTicketSchemaRequest{
 			Id: template.SchemaID,
-		}.Build())
+		})
 		if err != nil {
 			return err
 		}
 
-		ticketRequestBody := v2.TicketRequest_builder{
+		ticketRequestBody := &v2.TicketRequest{
 			DisplayName: template.DisplayName,
 			Description: template.Description,
 			Labels:      template.Labels,
-		}.Build()
+		}
 
 		if template.StatusId != "" {
-			ticketRequestBody.SetStatus(v2.TicketStatus_builder{
+			ticketRequestBody.Status = &v2.TicketStatus{
 				Id: template.StatusId,
-			}.Build())
+			}
 		}
 
 		if template.RequestedForId != "" {
@@ -101,28 +98,28 @@ func (m *localBulkCreateTicket) Process(ctx context.Context, task *v1.Task, cc t
 			if err != nil {
 				return err
 			}
-			ticketRequestBody.SetRequestedFor(requestedUser)
+			ticketRequestBody.RequestedFor = requestedUser
 		}
 
 		cfs := make(map[string]*v2.TicketCustomField)
 		for k, v := range template.CustomFields {
-			newCfs, err := sdkTicket.CustomFieldForSchemaField(k, schema.GetSchema(), v)
+			newCfs, err := sdkTicket.CustomFieldForSchemaField(k, schema.Schema, v)
 			if err != nil {
 				return err
 			}
 			cfs[k] = newCfs
 		}
-		ticketRequestBody.SetCustomFields(cfs)
+		ticketRequestBody.CustomFields = cfs
 
-		ticketReqs = append(ticketReqs, v2.TicketsServiceCreateTicketRequest_builder{
+		ticketReqs = append(ticketReqs, &v2.TicketsServiceCreateTicketRequest{
 			Request: ticketRequestBody,
 			Schema:  schema.GetSchema(),
-		}.Build())
+		})
 	}
 
-	bulkTicketReq := v2.TicketsServiceBulkCreateTicketsRequest_builder{
+	bulkTicketReq := &v2.TicketsServiceBulkCreateTicketsRequest{
 		TicketRequests: ticketReqs,
-	}.Build()
+	}
 
 	resp, err := cc.BulkCreateTickets(ctx, bulkTicketReq)
 	if err != nil {
@@ -183,9 +180,11 @@ func (m *localCreateTicket) ShouldDebug() bool {
 func (m *localCreateTicket) Next(ctx context.Context) (*v1.Task, time.Duration, error) {
 	var task *v1.Task
 	m.o.Do(func() {
-		task = v1.Task_builder{
-			CreateTicketTask: &v1.Task_CreateTicketTask{},
-		}.Build()
+		task = &v1.Task{
+			TaskType: &v1.Task_CreateTicketTask_{
+				CreateTicketTask: &v1.Task_CreateTicketTask{},
+			},
+		}
 	})
 	return task, 0, nil
 }
@@ -198,23 +197,23 @@ func (m *localCreateTicket) Process(ctx context.Context, task *v1.Task, cc types
 		return err
 	}
 
-	schema, err := cc.GetTicketSchema(ctx, v2.TicketsServiceGetTicketSchemaRequest_builder{
+	schema, err := cc.GetTicketSchema(ctx, &v2.TicketsServiceGetTicketSchemaRequest{
 		Id: template.SchemaID,
-	}.Build())
+	})
 	if err != nil {
 		return err
 	}
 
-	ticketRequestBody := v2.TicketRequest_builder{
+	ticketRequestBody := &v2.TicketRequest{
 		DisplayName: template.DisplayName,
 		Description: template.Description,
 		Labels:      template.Labels,
-	}.Build()
+	}
 
 	if template.StatusId != "" {
-		ticketRequestBody.SetStatus(v2.TicketStatus_builder{
+		ticketRequestBody.Status = &v2.TicketStatus{
 			Id: template.StatusId,
-		}.Build())
+		}
 	}
 
 	if template.RequestedForId != "" {
@@ -223,22 +222,22 @@ func (m *localCreateTicket) Process(ctx context.Context, task *v1.Task, cc types
 		if err != nil {
 			return err
 		}
-		ticketRequestBody.SetRequestedFor(requestedUser)
+		ticketRequestBody.RequestedFor = requestedUser
 	}
 
 	cfs := make(map[string]*v2.TicketCustomField)
 	for k, v := range template.CustomFields {
-		newCfs, err := sdkTicket.CustomFieldForSchemaField(k, schema.GetSchema(), v)
+		newCfs, err := sdkTicket.CustomFieldForSchemaField(k, schema.Schema, v)
 		if err != nil {
 			return err
 		}
 		cfs[k] = newCfs
 	}
-	ticketRequestBody.SetCustomFields(cfs)
-	ticketReq := v2.TicketsServiceCreateTicketRequest_builder{
+	ticketRequestBody.CustomFields = cfs
+	ticketReq := &v2.TicketsServiceCreateTicketRequest{
 		Request: ticketRequestBody,
 		Schema:  schema.GetSchema(),
-	}.Build()
+	}
 
 	resp, err := cc.CreateTicket(ctx, ticketReq)
 	if err != nil {
@@ -274,11 +273,13 @@ func (m *localGetTicket) ShouldDebug() bool {
 func (m *localGetTicket) Next(ctx context.Context) (*v1.Task, time.Duration, error) {
 	var task *v1.Task
 	m.o.Do(func() {
-		task = v1.Task_builder{
-			GetTicket: v1.Task_GetTicketTask_builder{
-				TicketId: m.ticketId,
-			}.Build(),
-		}.Build()
+		task = &v1.Task{
+			TaskType: &v1.Task_GetTicket{
+				GetTicket: &v1.Task_GetTicketTask{
+					TicketId: m.ticketId,
+				},
+			},
+		}
 	})
 	return task, 0, nil
 }
@@ -286,9 +287,9 @@ func (m *localGetTicket) Next(ctx context.Context) (*v1.Task, time.Duration, err
 func (m *localGetTicket) Process(ctx context.Context, task *v1.Task, cc types.ConnectorClient) error {
 	l := ctxzap.Extract(ctx)
 
-	resp, err := cc.GetTicket(ctx, v2.TicketsServiceGetTicketRequest_builder{
+	resp, err := cc.GetTicket(ctx, &v2.TicketsServiceGetTicketRequest{
 		Id: m.ticketId,
-	}.Build())
+	})
 	if err != nil {
 		return err
 	}
@@ -320,9 +321,9 @@ func (m *localListTicketSchemas) ShouldDebug() bool {
 func (m *localListTicketSchemas) Next(ctx context.Context) (*v1.Task, time.Duration, error) {
 	var task *v1.Task
 	m.o.Do(func() {
-		task = v1.Task_builder{
-			ListTicketSchemas: &v1.Task_ListTicketSchemasTask{},
-		}.Build()
+		task = &v1.Task{
+			TaskType: &v1.Task_ListTicketSchemas{},
+		}
 	})
 	return task, 0, nil
 }

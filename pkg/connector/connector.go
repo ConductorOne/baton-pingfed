@@ -34,9 +34,9 @@ func fallBackToHTTPS(domain string) (string, error) {
 	return parsed.String(), nil
 }
 
-// ResourceSyncers returns a ResourceSyncerV2 for each resource type that should be synced from the upstream service.
-func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncerV2 {
-	return []connectorbuilder.ResourceSyncerV2{
+// ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
+func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
+	return []connectorbuilder.ResourceSyncer{
 		newUserBuilder(d.client),
 		newRoleBuilder(d.client),
 	}
