@@ -7,7 +7,6 @@ import (
 	"github.com/conductorone/baton-pingfed/pkg/connector/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
 	"github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	"github.com/conductorone/baton-sdk/pkg/types/resource"
@@ -46,63 +45,61 @@ func (o *roleBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 func (o *roleBuilder) List(
 	ctx context.Context,
 	parentResourceID *v2.ResourceId,
-	pToken *pagination.Token,
+	opts resource.SyncOpAttrs,
 ) (
 	[]*v2.Resource,
-	string,
-	annotations.Annotations,
+	*resource.SyncOpResults,
 	error,
 ) {
 	roles, err := o.client.GetRoles(
 		ctx,
 	)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	rv := make([]*v2.Resource, 0)
 	for _, role := range roles {
 		newResource, err := roleResource(ctx, &role)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 
 		rv = append(rv, newResource)
 	}
-	return rv, "", nil, nil
+	return rv, &resource.SyncOpResults{NextPageToken: "", Annotations: nil}, nil
 }
 
 func (o *roleBuilder) Entitlements(
 	ctx context.Context,
-	resource *v2.Resource,
-	_ *pagination.Token,
+	r *v2.Resource,
+	_ resource.SyncOpAttrs,
 ) (
 	[]*v2.Entitlement,
-	string,
-	annotations.Annotations,
+	*resource.SyncOpResults,
 	error,
 ) {
 	logger := ctxzap.Extract(ctx)
 	logger.Debug(
 		"Roles.Entitlements",
-		zap.String("resource.DisplayName", resource.DisplayName),
-		zap.String("resource.Id.Resource", resource.Id.Resource),
+		zap.String("resource.DisplayName", r.DisplayName),
+		zap.String("resource.Id.Resource", r.Id.Resource),
 	)
 	entitlements := []*v2.Entitlement{
 		entitlement.NewAssignmentEntitlement(
-			resource,
+			r,
 			roleAssignmentEntitlementName,
 			entitlement.WithGrantableTo(resourceTypeUser),
 			entitlement.WithDisplayName(
-				fmt.Sprintf("%s User Role", resource.DisplayName),
+				fmt.Sprintf("%s User Role", r.DisplayName),
 			),
 			entitlement.WithDescription(
-				fmt.Sprintf("Has the %s role in PingFederate", resource.DisplayName),
+				fmt.Sprintf("Has the %s role in PingFederate", r.DisplayName),
 			),
 		),
 	}
 
-	return entitlements, "", nil, nil
+	return entitlements, &resource.SyncOpResults{NextPageToken: "", Annotations: nil}, nil
 }
 
 type UserRoleGrant struct {
@@ -112,26 +109,25 @@ type UserRoleGrant struct {
 
 func (o *roleBuilder) Grants(
 	ctx context.Context,
-	resource *v2.Resource,
-	pToken *pagination.Token,
+	r *v2.Resource,
+	opts resource.SyncOpAttrs,
 ) (
 	[]*v2.Grant,
-	string,
-	annotations.Annotations,
+	*resource.SyncOpResults,
 	error,
 ) {
 	assignments, err := o.client.GetRoleAssignments(
 		ctx,
-		resource.Id.Resource,
+		r.Id.Resource,
 	)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	grants := make([]*v2.Grant, 0)
 	for _, assignment := range assignments {
 		grants = append(grants, grant.NewGrant(
-			resource,
+			r,
 			roleAssignmentEntitlementName,
 			&v2.ResourceId{
 				ResourceType: resourceTypeUser.Id,
@@ -139,7 +135,7 @@ func (o *roleBuilder) Grants(
 			},
 		))
 	}
-	return grants, "", nil, nil
+	return grants, &resource.SyncOpResults{NextPageToken: "", Annotations: nil}, nil
 }
 
 func (o *roleBuilder) Grant(
