@@ -19,6 +19,7 @@ var (
 		"password",
 		field.WithDescription("Ping Federate account password"),
 		field.WithRequired(true),
+		field.WithIsSecret(true),
 	)
 
 	configurationFields = []field.SchemaField{
