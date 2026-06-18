@@ -1,4 +1,3 @@
-// Package main is the entry point for the baton-pingfederate connector.
 package main
 
 import (
@@ -16,7 +15,7 @@ func main() {
 	ctx := context.Background()
 	config.RunConnector(
 		ctx,
-		"baton-pingfederate",
+		"baton-pingfed",
 		version,
 		cfg.Config,
 		connector.NewLambdaConnector,
