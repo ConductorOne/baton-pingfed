@@ -1,5 +1,7 @@
+// Package client provides the PingFederate API client.
 package client
 
+// PingFederateUser represents a PingFederate administrative account.
 type PingFederateUser struct {
 	Email             string   `json:"emailAddress,omitempty"`
 	EncryptedPassword string   `json:"encryptedPassword"`
@@ -16,6 +18,7 @@ type getAdminUsersResponse struct {
 	Items []PingFederateUser `json:"items"`
 }
 
+// PingFederateRole represents a PingFederate administrative role.
 type PingFederateRole struct {
 	Name string `json:"name"`
 	ID   string `json:"id"`
