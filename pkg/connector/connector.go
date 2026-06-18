@@ -62,7 +62,11 @@ func (d *Connector) Metadata(_ context.Context) (*v2.ConnectorMetadata, error) {
 
 // Validate is called to ensure that the connector is properly configured. It should exercise any API credentials
 // to be sure that they are valid.
-func (d *Connector) Validate(_ context.Context) (annotations.Annotations, error) {
+func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, error) {
+	_, err := d.client.GetRoles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("baton-pingfed: failed to validate credentials: %w", err)
+	}
 	return nil, nil
 }
 
