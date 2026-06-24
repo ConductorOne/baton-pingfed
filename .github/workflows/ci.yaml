@@ -16,9 +16,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      BATON_USERNAME: ${{ secrets.PINGFEDERATE_USERNAME }}
-      BATON_PASSWORD: ${{ secrets.PINGFEDERATE_PASSWORD }}
-      BATON_INSTANCE_URL: ${{ secrets.PINGFEDERATE_BASEURL }}
+      BATON_INSTANCE_URL: http://localhost:8765
+      BATON_USERNAME: test-admin
+      BATON_PASSWORD: test-password
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,6 +28,10 @@ jobs:
           go-version-file: go.mod
       - name: Build baton-pingfed
         run: go build ./cmd/baton-pingfed
+      - name: Start test server
+        run: go run ./cmd/test-server/ &
+      - name: Wait for test server
+        run: sleep 2
       - name: Run baton-pingfed
         run: ./baton-pingfed
       - name: Install baton
