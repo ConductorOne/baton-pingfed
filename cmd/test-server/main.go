@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -174,7 +175,12 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("test-server: listening on %s", addr)
-	if err := http.ListenAndServe(addr, authMiddleware(mux)); err != nil {
-		log.Fatalf("test-server: %v", err)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           authMiddleware(mux),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil {
+		log.Printf("test-server: %v", err)
 	}
 }
