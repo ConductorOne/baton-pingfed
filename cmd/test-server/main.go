@@ -123,6 +123,11 @@ func main() {
 	state := NewState()
 	mux := http.NewServeMux()
 
+	// GET /health — unauthenticated liveness probe for CI readiness checks.
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
 	// GET /pf-admin-api/v1/administrativeAccounts
 	// Lists all administrative accounts. Used by GetUsers, GetRoles, and GetRoleAssignments.
 	// https://docs.pingidentity.com/r/en-us/pingfederate-112/pf_admin_api_reference_admin_accounts

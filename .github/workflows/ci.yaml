@@ -31,7 +31,7 @@ jobs:
       - name: Start test server
         run: go run ./cmd/test-server/ &
       - name: Wait for test server
-        run: until curl -sf http://localhost:8765/pf-admin-api/v1/administrativeAccounts -o /dev/null; do sleep 0.5; done
+        run: until curl -sf http://localhost:8765/health -o /dev/null; do sleep 0.5; done
       - name: Run baton-pingfed
         run: ./baton-pingfed
       - name: Install baton
