@@ -7,10 +7,9 @@ import (
 	"github.com/conductorone/baton-pingfed/pkg/connector/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
+	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
-	"github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 )
@@ -25,12 +24,12 @@ type roleBuilder struct {
 }
 
 // roleResource convert a PingFederateRole into a Resource.
-func roleResource(ctx context.Context, role *client.PingFederateRole) (*v2.Resource, error) {
-	newRoleResource, err := resource.NewRoleResource(
+func roleResource(_ context.Context, role *client.PingFederateRole) (*v2.Resource, error) {
+	newRoleResource, err := rs.NewRoleResource(
 		role.Name,
 		resourceTypeRole,
 		role.ID,
-		[]resource.RoleTraitOption{},
+		[]rs.RoleTraitOption{},
 	)
 	if err != nil {
 		return nil, err
@@ -39,47 +38,45 @@ func roleResource(ctx context.Context, role *client.PingFederateRole) (*v2.Resou
 	return newRoleResource, nil
 }
 
-func (o *roleBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
+func (o *roleBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return resourceTypeRole
 }
 
 func (o *roleBuilder) List(
 	ctx context.Context,
-	parentResourceID *v2.ResourceId,
-	pToken *pagination.Token,
+	_ *v2.ResourceId,
+	_ rs.SyncOpAttrs,
 ) (
 	[]*v2.Resource,
-	string,
-	annotations.Annotations,
+	*rs.SyncOpResults,
 	error,
 ) {
 	roles, err := o.client.GetRoles(
 		ctx,
 	)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	rv := make([]*v2.Resource, 0)
 	for _, role := range roles {
 		newResource, err := roleResource(ctx, &role)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 
 		rv = append(rv, newResource)
 	}
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
 func (o *roleBuilder) Entitlements(
 	ctx context.Context,
 	resource *v2.Resource,
-	_ *pagination.Token,
+	_ rs.SyncOpAttrs,
 ) (
 	[]*v2.Entitlement,
-	string,
-	annotations.Annotations,
+	*rs.SyncOpResults,
 	error,
 ) {
 	logger := ctxzap.Extract(ctx)
@@ -102,9 +99,10 @@ func (o *roleBuilder) Entitlements(
 		),
 	}
 
-	return entitlements, "", nil, nil
+	return entitlements, nil, nil
 }
 
+// UserRoleGrant represents a user-to-role assignment.
 type UserRoleGrant struct {
 	UserID     string
 	UserRoleID string
@@ -113,11 +111,10 @@ type UserRoleGrant struct {
 func (o *roleBuilder) Grants(
 	ctx context.Context,
 	resource *v2.Resource,
-	pToken *pagination.Token,
+	_ rs.SyncOpAttrs,
 ) (
 	[]*v2.Grant,
-	string,
-	annotations.Annotations,
+	*rs.SyncOpResults,
 	error,
 ) {
 	assignments, err := o.client.GetRoleAssignments(
@@ -125,7 +122,7 @@ func (o *roleBuilder) Grants(
 		resource.Id.Resource,
 	)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	grants := make([]*v2.Grant, 0)
@@ -139,7 +136,7 @@ func (o *roleBuilder) Grants(
 			},
 		))
 	}
-	return grants, "", nil, nil
+	return grants, nil, nil
 }
 
 func (o *roleBuilder) Grant(

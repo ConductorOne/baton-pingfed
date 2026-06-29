@@ -1,3 +1,4 @@
+// Package connector implements the PingFederate Baton connector.
 package connector
 
 import (
@@ -7,16 +8,19 @@ import (
 	"net/url"
 
 	"github.com/conductorone/baton-pingfed/pkg/connector/client"
+	cfg "github.com/conductorone/baton-pingfed/pkg/config"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/cli"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 )
 
+// Connector is the PingFederate connector implementation.
 type Connector struct {
 	ctx         context.Context
-	instanceUrl string
+	instanceURL string
 	client      *client.PingFederateClient
 }
 
@@ -34,9 +38,9 @@ func fallBackToHTTPS(domain string) (string, error) {
 	return parsed.String(), nil
 }
 
-// ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
-func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
-	return []connectorbuilder.ResourceSyncer{
+// ResourceSyncers returns a ResourceSyncerV2 for each resource type that should be synced from the upstream service.
+func (d *Connector) ResourceSyncers(_ context.Context) []connectorbuilder.ResourceSyncerV2 {
+	return []connectorbuilder.ResourceSyncerV2{
 		newUserBuilder(d.client),
 		newRoleBuilder(d.client),
 	}
@@ -44,12 +48,12 @@ func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.Reso
 
 // Asset takes an input AssetRef and attempts to fetch it using the connector's authenticated http client
 // It streams a response, always starting with a metadata object, following by chunked payloads for the asset.
-func (d *Connector) Asset(ctx context.Context, asset *v2.AssetRef) (string, io.ReadCloser, error) {
+func (d *Connector) Asset(_ context.Context, _ *v2.AssetRef) (string, io.ReadCloser, error) {
 	return "", nil, nil
 }
 
 // Metadata returns metadata about the connector.
-func (d *Connector) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
+func (d *Connector) Metadata(_ context.Context) (*v2.ConnectorMetadata, error) {
 	return &v2.ConnectorMetadata{
 		DisplayName: "Ping Federate",
 		Description: "Connector syncing  PingFederate users",
@@ -59,6 +63,10 @@ func (d *Connector) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error)
 // Validate is called to ensure that the connector is properly configured. It should exercise any API credentials
 // to be sure that they are valid.
 func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, error) {
+	_, err := d.client.GetRoles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("baton-pingfed: failed to validate credentials: %w", err)
+	}
 	return nil, nil
 }
 
@@ -95,7 +103,16 @@ func New(
 	connector := Connector{
 		client:      PingFederateClient,
 		ctx:         ctx,
-		instanceUrl: instanceURL,
+		instanceURL: instanceURL,
 	}
 	return &connector, nil
+}
+
+// NewLambdaConnector returns a new ConnectorBuilderV2 for use with lambda/containerized deployment.
+func NewLambdaConnector(ctx context.Context, ac *cfg.Pingfed, _ *cli.ConnectorOpts) (connectorbuilder.ConnectorBuilderV2, []connectorbuilder.Opt, error) {
+	cb, err := New(ctx, ac.InstanceUrl, ac.Username, ac.Password)
+	if err != nil {
+		return nil, nil, err
+	}
+	return cb, nil, nil
 }

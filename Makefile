@@ -1,16 +1,30 @@
 GOOS = $(shell go env GOOS)
 GOARCH = $(shell go env GOARCH)
 BUILD_DIR = dist/${GOOS}_${GOARCH}
+GENERATED_CONF := pkg/config/conf.gen.go
 
 ifeq ($(GOOS),windows)
-OUTPUT_PATH = ${BUILD_DIR}/baton-pingfederate.exe
+OUTPUT_PATH = ${BUILD_DIR}/baton-pingfed.exe
 else
-OUTPUT_PATH = ${BUILD_DIR}/baton-pingfederate
+OUTPUT_PATH = ${BUILD_DIR}/baton-pingfed
+endif
+
+# Set the build tag conditionally based on BATON_LAMBDA_SUPPORT
+ifdef BATON_LAMBDA_SUPPORT
+	BUILD_TAGS=-tags baton_lambda_support
+else
+	BUILD_TAGS=
 endif
 
 .PHONY: build
-build:
-	go build -o ${OUTPUT_PATH} ./cmd/baton-pingfederate
+build: $(GENERATED_CONF)
+	go build ${BUILD_TAGS} -o ${OUTPUT_PATH} ./cmd/baton-pingfed
+
+$(GENERATED_CONF): pkg/config/config.go go.mod
+	@echo "Generating $(GENERATED_CONF)..."
+	go generate ./pkg/config
+
+generate: $(GENERATED_CONF)
 
 .PHONY: update-deps
 update-deps:
@@ -25,24 +39,4 @@ add-dep:
 
 .PHONY: lint
 lint:
-	golangci-lint run ./...
-
-.PHONY: lint-fix
-lint-fix:
-	golangci-lint run --fix ./...
-
-.PHONY: release
-release:
-	goreleaser release --rm-dist
-
-.PHONY: release-snapshot
-release-snapshot:
-	goreleaser release --snapshot --rm-dist
-
-.PHONY: install-tools
-install-tools:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	go install github.com/goreleaser/goreleaser@latest
-
-.PHONY: ci
-ci: install-tools lint build
+	golangci-lint run

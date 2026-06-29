@@ -9,6 +9,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 )
 
+// PingFederateClient is an HTTP client for the PingFederate admin API.
 type PingFederateClient struct {
 	baseURL  string
 	client   *uhttp.BaseHttpClient
@@ -16,11 +17,13 @@ type PingFederateClient struct {
 	Password string
 }
 
+// API constants for PingFederate.
 const (
 	APIPath     = "/pf-admin-api/v1"
 	AuditorRole = "AUDITOR"
 )
 
+// New creates a new PingFederateClient.
 func New(
 	ctx context.Context,
 	baseURL string,
@@ -127,6 +130,7 @@ func (c *PingFederateClient) GetRoles(ctx context.Context) ([]PingFederateRole, 
 	return roles, nil
 }
 
+// GetRoleAssignments returns all users assigned to the given role.
 func (c *PingFederateClient) GetRoleAssignments(ctx context.Context, roleID string) ([]PingFederateUser, error) {
 	var response getAdminUsersResponse
 	err := c.doRequest(ctx, http.MethodGet, "/administrativeAccounts", nil, &response)
@@ -155,6 +159,7 @@ func (c *PingFederateClient) GetRoleAssignments(ctx context.Context, roleID stri
 	return usersWithRole, nil
 }
 
+// AddUserToRole adds the given user to the given role.
 func (c *PingFederateClient) AddUserToRole(ctx context.Context, userID string, roleID string) error {
 	var user PingFederateUser
 	err := c.doRequest(ctx, http.MethodGet, "/administrativeAccounts/"+userID, nil, &user)
@@ -176,6 +181,7 @@ func (c *PingFederateClient) AddUserToRole(ctx context.Context, userID string, r
 	return nil
 }
 
+// RemoveUserFromRole removes the given user from the given role.
 func (c *PingFederateClient) RemoveUserFromRole(ctx context.Context, userID string, roleID string) error {
 	var user PingFederateUser
 	err := c.doRequest(ctx, http.MethodGet, "/administrativeAccounts/"+userID, nil, &user)

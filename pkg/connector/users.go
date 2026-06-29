@@ -6,9 +6,7 @@ import (
 
 	"github.com/conductorone/baton-pingfed/pkg/connector/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
-	"github.com/conductorone/baton-sdk/pkg/annotations"
-	"github.com/conductorone/baton-sdk/pkg/pagination"
-	"github.com/conductorone/baton-sdk/pkg/types/resource"
+	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
 
 type userBuilder struct {
@@ -35,17 +33,17 @@ func userResource(
 		"description": user.Description,
 	}
 
-	userTraitOptions := []resource.UserTraitOption{
-		resource.WithUserProfile(profile),
-		resource.WithStatus(status),
-		resource.WithUserLogin(user.Username),
+	userTraitOptions := []rs.UserTraitOption{
+		rs.WithUserProfile(profile),
+		rs.WithStatus(status),
+		rs.WithUserLogin(user.Username),
 	}
 
 	if user.Email != "" {
-		userTraitOptions = append(userTraitOptions, resource.WithEmail(user.Email, true))
+		userTraitOptions = append(userTraitOptions, rs.WithEmail(user.Email, true))
 	}
 
-	newUserResource, err := resource.NewUserResource(
+	newUserResource, err := rs.NewUserResource(
 		displayName,
 		resourceTypeUser,
 		user.Username,
@@ -58,65 +56,62 @@ func userResource(
 	return newUserResource, nil
 }
 
-func (o *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
+func (o *userBuilder) ResourceType(_ context.Context) *v2.ResourceType {
 	return resourceTypeUser
 }
 
 // List returns all the users from the database as resource objects.
 // Users include a UserTrait because they are the 'shape' of a standard user.
-func (b *userBuilder) List(
+func (o *userBuilder) List(
 	ctx context.Context,
-	resourceID *v2.ResourceId,
-	token *pagination.Token,
+	_ *v2.ResourceId,
+	_ rs.SyncOpAttrs,
 ) (
 	[]*v2.Resource,
-	string,
-	annotations.Annotations,
+	*rs.SyncOpResults,
 	error,
 ) {
-	users, err := b.client.GetUsers(ctx)
+	users, err := o.client.GetUsers(ctx)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("failed to list users: %w", err)
+		return nil, nil, fmt.Errorf("failed to list users: %w", err)
 	}
 
 	rv := make([]*v2.Resource, 0)
 	for _, user := range users {
 		ur, err := userResource(user)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 		rv = append(rv, ur)
 	}
 
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
 // Entitlements always returns an empty slice for users.
 func (o *userBuilder) Entitlements(
 	_ context.Context,
-	resource *v2.Resource,
-	_ *pagination.Token,
+	_ *v2.Resource,
+	_ rs.SyncOpAttrs,
 ) (
 	[]*v2.Entitlement,
-	string,
-	annotations.Annotations,
+	*rs.SyncOpResults,
 	error,
 ) {
-	return nil, "", nil, nil
+	return nil, nil, nil
 }
 
 // Grants always returns an empty slice for users since they don't have any entitlements.
 func (o *userBuilder) Grants(
-	ctx context.Context,
-	resource *v2.Resource,
-	pToken *pagination.Token,
+	_ context.Context,
+	_ *v2.Resource,
+	_ rs.SyncOpAttrs,
 ) (
 	[]*v2.Grant,
-	string,
-	annotations.Annotations,
+	*rs.SyncOpResults,
 	error,
 ) {
-	return nil, "", nil, nil
+	return nil, nil, nil
 }
 
 func newUserBuilder(
