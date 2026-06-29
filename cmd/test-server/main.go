@@ -121,17 +121,12 @@ func authMiddleware(next http.Handler) http.Handler {
 
 func main() {
 	state := NewState()
-	mux := http.NewServeMux()
-
-	// GET /health — unauthenticated liveness probe for CI readiness checks.
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	apiMux := http.NewServeMux()
 
 	// GET /pf-admin-api/v1/administrativeAccounts
 	// Lists all administrative accounts. Used by GetUsers, GetRoles, and GetRoleAssignments.
 	// https://docs.pingidentity.com/r/en-us/pingfederate-112/pf_admin_api_reference_admin_accounts
-	mux.HandleFunc(apiPrefix+"/administrativeAccounts", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc(apiPrefix+"/administrativeAccounts", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
@@ -143,7 +138,7 @@ func main() {
 	// PUT /pf-admin-api/v1/administrativeAccounts/{username}
 	// Used by AddUserToRole and RemoveUserFromRole (GET then PUT pattern).
 	// https://docs.pingidentity.com/r/en-us/pingfederate-112/pf_admin_api_reference_admin_accounts
-	mux.HandleFunc(apiPrefix+"/administrativeAccounts/", func(w http.ResponseWriter, r *http.Request) {
+	apiMux.HandleFunc(apiPrefix+"/administrativeAccounts/", func(w http.ResponseWriter, r *http.Request) {
 		username := strings.TrimPrefix(r.URL.Path, apiPrefix+"/administrativeAccounts/")
 		if username == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "username is required"})
@@ -178,11 +173,18 @@ func main() {
 		}
 	})
 
+	// /health bypasses auth; all API routes require auth via authMiddleware.
+	outerMux := http.NewServeMux()
+	outerMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	outerMux.Handle("/", authMiddleware(apiMux))
+
 	addr := ":" + port
 	log.Printf("test-server: listening on %s", addr)
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           authMiddleware(mux),
+		Handler:           outerMux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	if err := srv.ListenAndServe(); err != nil {
