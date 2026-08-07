@@ -34,8 +34,6 @@ func userResource(
 	}
 
 	userTraitOptions := []rs.UserTraitOption{
-		rs.WithUserProfile(profile),
-		rs.WithStatus(status),
 		rs.WithUserLogin(user.Username),
 	}
 
@@ -48,6 +46,8 @@ func userResource(
 		resourceTypeUser,
 		user.Username,
 		userTraitOptions,
+		rs.WithResourceProfile(profile),
+		rs.WithResourceStatus(v2.Status_ResourceStatus(status), ""),
 	)
 	if err != nil {
 		return nil, err
