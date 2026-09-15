@@ -7,9 +7,9 @@ import (
 	"github.com/conductorone/baton-pingfed/pkg/connector/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
-	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
+	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 )
@@ -143,15 +143,9 @@ func (o *roleBuilder) Grant(
 	ctx context.Context,
 	principal *v2.Resource,
 	entitlement *v2.Entitlement,
-) (annotations.Annotations, error) {
-	logger := ctxzap.Extract(ctx)
+) ([]*v2.Grant, annotations.Annotations, error) {
 	if principal.Id.ResourceType != resourceTypeUser.Id {
-		logger.Warn(
-			"pingfederate-connector: only users can be granted roles",
-			zap.String("principal_type", principal.Id.ResourceType),
-			zap.String("principal_id", principal.Id.Resource),
-		)
-		return nil, fmt.Errorf("pingfederate-connector: only users can be granted roles")
+		return nil, nil, fmt.Errorf("pingfederate-connector: only users can be granted roles")
 	}
 
 	err := o.client.AddUserToRole(
@@ -159,7 +153,16 @@ func (o *roleBuilder) Grant(
 		principal.Id.Resource,
 		entitlement.Resource.Id.Resource,
 	)
-	return nil, err
+	if err != nil {
+		return nil, nil, err
+	}
+
+	newGrant := grant.NewGrant(
+		entitlement.Resource,
+		roleAssignmentEntitlementName,
+		principal.Id,
+	)
+	return []*v2.Grant{newGrant}, nil, nil
 }
 
 func (o *roleBuilder) Revoke(
