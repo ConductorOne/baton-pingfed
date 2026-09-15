@@ -35,7 +35,7 @@ jobs:
       - name: Run baton-pingfed
         run: ./baton-pingfed
       - name: Install baton
-        run: ./scripts/get-baton.sh && mv baton /usr/local/bin
+        uses: ConductorOne/github-workflows/actions/get-baton@v4
       - name: Test grant/revoking admin entitlements
         env:
           BATON: baton
