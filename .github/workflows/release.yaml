@@ -8,7 +8,7 @@ on:
 
 jobs:
   release:
-    uses: ConductorOne/github-workflows/.github/workflows/release.yaml@v4
+    uses: ConductorOne/github-workflows/.github/workflows/release.yaml@macos-latest-xlarge-parallelism
     with:
       tag: ${{ github.ref_name }}
     secrets:
